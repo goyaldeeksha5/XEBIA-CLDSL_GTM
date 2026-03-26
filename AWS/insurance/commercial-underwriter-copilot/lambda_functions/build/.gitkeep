@@ -1,0 +1,2 @@
+# Lambda deployment packages will be generated here by build.py
+# This directory contains the ZIP files for Lambda function deployment
