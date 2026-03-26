@@ -1,0 +1,40 @@
+# Terraform files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Local environment
+*.tfvars
+!terraform.tfvars.example
+
+# OS
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+
+# IDE
+.idea/
+*.iml
+
+# Dependencies
+aws/
+awscliv2.zip
+node_modules/
+
+# Sensitive
+.env
+.env.local
+*.pem
+*.key

@@ -1,0 +1,61 @@
+openapi: 3.0.0
+info:
+  title: GTM Insurance Dynamic Rating API
+  version: 1.2.0
+paths:
+  /simulate:
+    post:
+      operationId: run_rate_simulation
+      description: Triggers a dynamic pricing simulation based on IoT and market signals.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                policy_id:
+                  type: string
+                  description: Policy ID for the insurance product
+                telematics_score:
+                  type: integer
+                  description: Telematics risk score (0-100)
+                  minimum: 0
+                  maximum: 100
+                current_premium:
+                  type: number
+                  description: Current premium amount
+                  minimum: 0
+              required:
+                - policy_id
+                - telematics_score
+                - current_premium
+      responses:
+        '200':
+          description: Successfully generated dynamic rating proposal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ProposalID:
+                    type: string
+                    description: Unique proposal identifier
+                  PolicyID:
+                    type: string
+                    description: Original policy ID
+                  OriginalPremium:
+                    type: string
+                    description: Original premium amount
+                  ProposedPremium:
+                    type: string
+                    description: New proposed premium based on simulation
+                  Rationale:
+                    type: string
+                    description: Explanation of pricing decision
+                  Status:
+                    type: string
+                    description: Current proposal status
+        '400':
+          description: Invalid input parameters
+        '500':
+          description: Internal server error
