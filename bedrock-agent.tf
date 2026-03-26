@@ -1,165 +1,59 @@
-# Bedrock Agent for Dynamic Pricing Rating Engine
-# This agent orchestrates the pricing simulation workflow
+# ⚠️ NOTE: Bedrock Agent terraform support is limited in AWS provider v5.0
+# For full Bedrock Agent setup, use AWS Console or Bedrock API directly
+# 
+# To deploy Bedrock Agent manually:
+# 1. Go to AWS Bedrock Console > Agents
+# 2. Create Agent with these settings:
+#    - Name: GTM-Dynamic-Pricing-Agent
+#    - Model: Claude 3 Sonnet
+#    - Instructions: (see BEDROCK_TESTING_GUIDE.md)
+#
+# 3. Add Action Group:
+#    - Name: PricingSimulator
+#    - Lambda: GTM_insurance_dynamicpricing_ratingengine_Gateway
+#    - Schema: (see DynamicPricing_Rating_engine/openapi.yaml)
+#
+# 4. Add Guardrails:
+#    - Enable content filtering
+#    - Configure PII detection
+#
+# Once created, use Bedrock Console to get Agent ID and Alias ID
+# Then run: python3 bedrock-test-automation.py --agent-id <YOUR_ID>
 
-resource "aws_bedrockagent_agent" "gtm_rating_agent" {
-  agent_name             = "GTM-Dynamic-Pricing-Agent"
-  agent_resource_role_arn = aws_iam_role.bedrock_agent_role.arn
-  idle_session_ttl_in_seconds = 900
-  foundation_model       = "anthropic.claude-3-sonnet-20240229-v1:0"
+# Local reference for agent configuration
+locals {
+  bedrock_agent_config = {
+    name        = "GTM-Dynamic-Pricing-Agent"
+    model       = "anthropic.claude-3-sonnet-20240229-v1:0"
+    description = "Agentic Rating Engine for Dynamic Insurance Pricing"
+    
+    system_prompt = <<-EOF
+You are an advanced Insurance Pricing Agent for XEBIA's Dynamic Rating Engine.
 
-  instruction = <<-EOF
-You are an advanced Insurance Pricing Agent for XEBIA's Dynamic Rating Engine. Your role is to:
-
-1. **THINK**: Analyze risk signals in real-time (telematics scores, market conditions)
-2. **SENSE**: Retrieve actuarial guidelines from the knowledge base
-3. **ACT**: Invoke the Lambda simulation tool to calculate dynamic premiums
-4. **RESPOND**: Explain pricing decisions with market benchmarking
+## Your Role:
+1. **THINK**: Analyze risk signals (telematics scores, market conditions)
+2. **SENSE**: Retrieve actuarial guidelines
+3. **ACT**: Invoke pricing simulation tool
+4. **RESPOND**: Explain decisions with benchmarking
 
 ## Guidelines:
-- Always cite the telematics score and risk multiplier in your recommendations
-- Maintain rate adjustments within ±15% of the baseline premium
-- Provide market positioning context (vs. $132,000 average)
-- Flag any proposals exceeding risk thresholds for manual review
+- Cite telematics score and risk multiplier
+- Maintain rate adjustments within ±15%
+- Provide market positioning context
+- Flag proposals exceeding thresholds
 
 ## Constraints:
-- Do NOT reveal competitor pricing details that weren't provided
-- Do NOT adjust rates based on customer demographics (compliance)
-- Do NOT propose discounts > 5% without actuarial approval
-- Respond ONLY to insurance-related queries
-
-Respond conversationally but with technical precision.
+- Do NOT reveal competitor pricing
+- Do NOT adjust based on demographics
+- Do NOT propose discounts >5% without approval
+- Respond ONLY to insurance queries
 EOF
-
-  agent_type = "ORCHESTRATOR"
-  
-  tags = {
-    Project     = "GTM Dynamic Pricing"
-    Environment = "production"
   }
 }
 
-# Agent Alias for production deployment
-resource "aws_bedrockagent_agent_alias" "gtm_rating_agent_prod" {
-  agent_id      = aws_bedrockagent_agent.gtm_rating_agent.id
-  agent_alias_name = "production"
-  description   = "Production agent for live pricing simulations"
-}
+# ===== IAM ROLES (for future use) =====
 
-# Action Group: Link Lambda function as a tool
-resource "aws_bedrockagent_agent_action_group" "simulate_pricing" {
-  agent_id           = aws_bedrockagent_agent.gtm_rating_agent.id
-  action_group_name  = "PricingSimulator"
-  description        = "Simulates dynamic pricing based on risk signals"
-  action_group_executor_type = "LAMBDA"
-
-  function_schema {
-    lambda_arn = aws_lambda_function.gtm_agent_gateway.arn
-  }
-
-  api_schema {
-    s3_arn = aws_s3_object.openapi_schema.arn
-  }
-}
-
-# KnowledgeBase for actuarial guidelines (optional but recommended)
-resource "aws_bedrockagent_knowledge_base" "actuarial_guidelines" {
-  name               = "GTM-Actuarial-Guidelines"
-  role_arn           = aws_iam_role.bedrock_kb_role.arn
-  knowledge_base_type = "VECTOR_RDS"
-
-  storage_configuration {
-    rds_configuration {
-      credentials_secret_arn = aws_secretsmanager_secret.rds_credentials.arn
-      database_name          = "actuarial_db"
-      table_name             = "guidelines"
-      resource_field         = "content"
-    }
-  }
-
-  tags = {
-    Project = "GTM Dynamic Pricing"
-  }
-}
-
-# Bedrock Guardrails for compliance
-resource "aws_bedrockguardrail" "insurance_compliance" {
-  name                      = "GTM-Insurance-Guardrail"
-  description               = "Ensures compliance and prevents prompt injection"
-  blocked_input_messaging   = "I can only assist with insurance pricing queries."
-  blocked_output_messaging  = "I cannot provide that information."
-
-  sensitive_information_policy {
-    pii_entities_config {
-      actions = ["BLOCK", "ANONYMIZE"]
-      
-      regex_configs {
-        name    = "SSN"
-        pattern = "\\d{3}-\\d{2}-\\d{4}"
-        action  = "ANONYMIZE"
-      }
-
-      regex_configs {
-        name    = "PolicyNumber"
-        pattern = "[A-Z]{3}-\\d{3}-[A-Z]{3}-\\d{4}"
-        action  = "BLOCK"
-      }
-    }
-  }
-
-  topic_policy {
-    topics_config {
-      name      = "InsurancePricing"
-      type      = "ALLOWED"
-      examples  = ["Calculate premium", "What is the risk score?", "Show rate adjustment"]
-    }
-
-    topics_config {
-      name      = "OffTopic"
-      type      = "DENIED"
-      examples  = ["Tell a joke", "What's the weather?", "Sports updates"]
-    }
-
-    topics_config {
-      name      = "PII"
-      type      = "DENIED"
-      examples  = ["Customer list", "Policy holder names", "Social security numbers"]
-    }
-  }
-
-  content_policy {
-    filters_config {
-      type       = "PROFANITY"
-      input_strength  = "MEDIUM"
-      output_strength = "MEDIUM"
-    }
-
-    filters_config {
-      type       = "HATE"
-      input_strength  = "HIGH"
-      output_strength = "HIGH"
-    }
-  }
-
-  word_policy {
-    managed_word_lists_config {
-      type = "PROFANITY"
-    }
-  }
-
-  tags = {
-    Project     = "GTM Dynamic Pricing"
-    Compliance  = "Insurance Regulatory"
-  }
-}
-
-# Attach Guardrail to Agent
-resource "aws_bedrockagent_agent_guardrail_configuration" "gtm_safety" {
-  agent_id              = aws_bedrockagent_agent.gtm_rating_agent.id
-  guardrail_identifier  = aws_bedrockguardrail.insurance_compliance.id
-  guardrail_version     = "1"
-}
-
-# IAM Role for Bedrock Agent
+# IAM Role for Bedrock Agent (when deployed via Console)
 resource "aws_iam_role" "bedrock_agent_role" {
   name = "bedrock-gtm-agent-role"
 
@@ -187,19 +81,12 @@ resource "aws_iam_role_policy" "bedrock_agent_policy" {
           "bedrock:RetrieveAndGenerate"
         ]
         Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject"
-        ]
-        Resource = "${aws_s3_bucket.openapi_schema.arn}/*"
       }
     ]
   })
 }
 
-# IAM Role for Knowledge Base
+# IAM Role for Knowledge Base (when deployed via Console)
 resource "aws_iam_role" "bedrock_kb_role" {
   name = "bedrock-kb-role"
 
@@ -213,18 +100,40 @@ resource "aws_iam_role" "bedrock_kb_role" {
   })
 }
 
-# Outputs
-output "bedrock_agent_id" {
-  value       = aws_bedrockagent_agent.gtm_rating_agent.id
-  description = "Bedrock Agent ID for API calls"
+# ===== OUTPUTS =====
+
+output "bedrock_setup_instructions" {
+  value = <<-EOF
+To set up Bedrock Agent manually:
+
+1. Go to AWS Bedrock Console > Agents
+2. Create Agent:
+   - Name: GTM-Dynamic-Pricing-Agent
+   - Model: Claude 3 Sonnet
+   - Instructions: (see BEDROCK_TESTING_GUIDE.md)
+
+3. Add Action Group:
+   - Name: PricingSimulator
+   - Lambda: GTM_insurance_dynamicpricing_ratingengine_Gateway
+   - Schema: DynamicPricing_Rating_engine/openapi.yaml
+
+4. Create Agent Alias:
+   - Name: production
+
+5. Enable Guardrails (AWS Console):
+   - Content filtering
+   - PII detection (SSN, customer data)
+   - Off-topic blocking
+
+After setup, get Agent ID and run:
+python3 bedrock-test-automation.py --agent-id <YOUR_ID> --region ap-south-1
+EOF
+
+  description = "Manual setup instructions for Bedrock Agent"
 }
 
-output "bedrock_agent_alias_id" {
-  value       = aws_bedrockagent_agent_alias.gtm_rating_agent_prod.id
-  description = "Bedrock Agent Alias for production"
+output "bedrock_agent_iam_role_arn" {
+  value       = aws_iam_role.bedrock_agent_role.arn
+  description = "IAM role ARN for Bedrock Agent (use in Console)"
 }
 
-output "guardrail_id" {
-  value       = aws_bedrockguardrail.insurance_compliance.id
-  description = "Guardrail ID for safety controls"
-}

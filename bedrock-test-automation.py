@@ -3,7 +3,22 @@
 Bedrock Agent Testing Automation Framework
 Tests all 4 layers: Think, Sense, Action, Safety
 
-Run: python3 bedrock-test-automation.py --agent-id <id> --region ap-south-1
+REQUIRED SETUP:
+1. Create Bedrock Agent in AWS Console > Bedrock > Agents
+2. Get Agent ID and Alias ID from console
+3. Run tests with actual IDs
+
+USAGE:
+  python3 bedrock-test-automation.py --agent-id <ID> [--alias <ALIAS>] [--region ap-south-1]
+
+ENVIRONMENT VARIABLES:
+  BEDROCK_AGENT_ID: Bedrock Agent ID (from console)
+  BEDROCK_AGENT_ALIAS: Agent Alias ID (default: PROD)
+  AWS_REGION: AWS region (default: ap-south-1)
+
+EXAMPLE:
+  export BEDROCK_AGENT_ID=A6N7J8C9K2X1
+  python3 bedrock-test-automation.py --alias PROD
 """
 
 import json
@@ -11,21 +26,40 @@ import time
 import boto3
 import argparse
 import sys
+import os
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 class BedrockAgentTester:
     def __init__(self, agent_id: str, agent_alias_id: str, region: str = "ap-south-1"):
+        # Validate agent_id format
+        if not agent_id or agent_id.startswith("YOUR_") or agent_id == "PLACEHOLDER":
+            raise ValueError(
+                "❌ INVALID AGENT ID\n\n"
+                "Setup required:\n"
+                "1. Go to AWS Console > Bedrock > Agents\n"
+                "2. Create 'GTM-Dynamic-Pricing-Agent'\n"
+                "3. Get Agent ID from settings page\n"
+                "4. Run: python3 bedrock-test-automation.py --agent-id <YOUR_ACTUAL_ID>\n"
+            )
+        
         self.agent_id = agent_id
-        self.agent_alias_id = agent_alias_id
+        self.agent_alias_id = agent_alias_id or "PROD"
         self.region = region
-        self.bedrock_client = boto3.client("bedrock-agent-runtime", region_name=region)
-        self.lambda_client = boto3.client("lambda", region_name=region)
-        self.dynamodb_client = boto3.client("dynamodb", region_name=region)
+        
+        try:
+            self.bedrock_client = boto3.client("bedrock-agent-runtime", region_name=region)
+            self.lambda_client = boto3.client("lambda", region_name=region)
+            self.dynamodb_client = boto3.client("dynamodb", region_name=region)
+            print(f"✅ AWS clients initialized")
+            print(f"   Agent ID: {agent_id}")
+            print(f"   Alias: {agent_alias_id}")
+            print(f"   Region: {region}\n")
+        except Exception as e:
+            raise ValueError(f"❌ Failed to initialize AWS clients: {e}\nCheck AWS credentials and region")
         
         self.test_results = {
             "think": [],
-            "sense": [],
             "action": [],
             "safety": [],
             "e2e": []
@@ -355,23 +389,65 @@ class BedrockAgentTester:
         return report
 
 def main():
-    parser = argparse.ArgumentParser(description="Bedrock Agent Testing Framework")
-    parser.add_argument("--agent-id", required=True, help="Bedrock Agent ID")
-    parser.add_argument("--agent-alias-id", default="AKIA", help="Bedrock Agent Alias ID")
-    parser.add_argument("--region", default="ap-south-1", help="AWS Region")
-    parser.add_argument("--test-data", default="bedrock-test-data.json", help="Test data file")
-    parser.add_argument("--layer", default="all", choices=["think", "sense", "action", "safety", "e2e", "all"])
+    parser = argparse.ArgumentParser(
+        description="Bedrock Agent Testing Framework",
+        epilog="Environment Variables: BEDROCK_AGENT_ID, BEDROCK_AGENT_ALIAS, AWS_REGION"
+    )
+    parser.add_argument(
+        "--agent-id", 
+        help="Bedrock Agent ID (from AWS Console > Bedrock > Agents)",
+        default=os.getenv("BEDROCK_AGENT_ID")
+    )
+    parser.add_argument(
+        "--alias", 
+        dest="agent_alias_id",
+        help="Bedrock Agent Alias (default: PROD)",
+        default=os.getenv("BEDROCK_AGENT_ALIAS", "PROD")
+    )
+    parser.add_argument(
+        "--region", 
+        help="AWS Region (default: ap-south-1)",
+        default=os.getenv("AWS_REGION", "ap-south-1")
+    )
+    parser.add_argument(
+        "--test-data", 
+        help="Test data JSON file",
+        default="bedrock-test-data.json"
+    )
+    parser.add_argument(
+        "--layer", 
+        help="Run specific layer tests",
+        choices=["think", "action", "safety", "e2e", "all"],
+        default="all"
+    )
     
     args = parser.parse_args()
     
+    # Validate Agent ID
+    if not args.agent_id:
+        print("❌ ERROR: Agent ID required\n")
+        print("Provide Agent ID via:")
+        print("  1. Command line: --agent-id <ID>")
+        print("  2. Environment: export BEDROCK_AGENT_ID=<ID>")
+        print("\nTo get Agent ID:")
+        print("  1. Go to AWS Console > Bedrock > Agents")
+        print("  2. Create new agent (name: GTM-Dynamic-Pricing-Agent)")
+        print("  3. Copy Agent ID from agent settings\n")
+        sys.exit(1)
+    
     # Initialize tester
-    tester = BedrockAgentTester(args.agent_id, args.agent_alias_id, args.region)
+    try:
+        tester = BedrockAgentTester(args.agent_id, args.agent_alias_id, args.region)
+    except ValueError as e:
+        print(str(e))
+        sys.exit(1)
     
     # Load test data
     try:
         test_data = tester.load_test_data(args.test_data)
     except FileNotFoundError:
-        print(f"Error: Test data file not found: {args.test_data}")
+        print(f"❌ ERROR: Test data file not found: {args.test_data}")
+        print(f"   Create it by running: python3 bedrock-test-automation.py --generate-data")
         sys.exit(1)
     
     # Run tests
