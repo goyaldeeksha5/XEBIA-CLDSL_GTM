@@ -12,7 +12,8 @@ LAMBDA_FUNCTIONS = {
     'orchestration_agent': 'orchestration_agent.py',
     'extraction_agent': 'extraction_agent.py',
     'validation_agent': 'validation_agent.py',
-    'summary_agent': 'summary_agent.py'
+    'summary_agent': 'summary_agent.py',
+    'status_retriever': 'status_retriever.py'
 }
 
 FUNCTIONS_DIR = Path(__file__).parent

@@ -1,0 +1,791 @@
+openapi: 3.0.0
+info:
+  title: Commercial Underwriter Co-Pilot API
+  description: |
+    High-precision agentic assistant API for automating commercial insurance underwriting.
+    Orchestrates multi-agent workflow for data extraction, validation, and memo generation.
+  version: 1.0.0
+  contact:
+    name: Underwriting Operations
+    email: underwriting@company.com
+  license:
+    name: Proprietary
+    url: https://company.com/license
+
+servers:
+  - url: https://api.underwriter-copilot.company.com/v1
+    description: Production API
+  - url: https://staging-api.underwriter-copilot.company.com/v1
+    description: Staging environment
+  - url: http://localhost:8000/v1
+    description: Local development
+
+paths:
+  /health:
+    get:
+      operationId: health_check
+      summary: API Health Check
+      description: Verifies that the AgentCore API and all backend services are operational
+      tags:
+        - System
+      responses:
+        '200':
+          description: All services operational
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                    example: healthy
+                  services:
+                    type: object
+                    properties:
+                      s3:
+                        type: string
+                        enum: [ok, error]
+                      lambda:
+                        type: string
+                        enum: [ok, error]
+                      bedrock:
+                        type: string
+                        enum: [ok, error]
+                      sagemaker:
+                        type: string
+                        enum: [ok, error]
+                  timestamp:
+                    type: string
+                    format: date-time
+        '503':
+          description: One or more services unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /triage-submission:
+    post:
+      operationId: triage_submission
+      summary: Submit Document for Triaging
+      description: |
+        Automates the complete underwriting workflow:
+        1. Data extraction from unstructured documents
+        2. Business rule validation against appetite guidelines
+        3. Risk scoring via machine learning model
+        4. Professional memo generation
+      tags:
+        - Submissions
+      requestBody:
+        required: true
+        description: Submission with document URI and optional metadata
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriageRequest'
+      responses:
+        '202':
+          description: |
+            Submission accepted and processing initiated.
+            Returns submission_id for tracking workflow progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriageResponse'
+        '400':
+          description: Invalid request (missing required fields, invalid S3 URI)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: S3 document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error during processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /submission/{submission_id}:
+    get:
+      operationId: get_submission_status
+      summary: Get Submission Status
+      description: |
+        Retrieves the current status and progress of a submission
+        through the multi-agent workflow pipeline.
+      tags:
+        - Submissions
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          description: Unique submission identifier (format: SUB-YYYYMMDD-XXXXXXXX)
+          schema:
+            type: string
+            pattern: '^SUB-\d{8}-[A-Z0-9]{8}$'
+      responses:
+        '200':
+          description: Submission status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionStatus'
+        '404':
+          description: Submission not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error retrieving submission status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /submission/{submission_id}/extraction:
+    get:
+      operationId: get_extraction_result
+      summary: Get Extracted Data
+      description: |
+        Retrieves the extraction stage results:
+        - Insured information
+        - Policy details
+        - Coverage limits
+        - Loss history
+        - Special conditions
+      tags:
+        - Submissions
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Extraction results retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractionResult'
+        '202':
+          description: Extraction still in progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [processing]
+                  estimated_completion:
+                    type: string
+                    format: date-time
+        '404':
+          description: Submission or extraction result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /submission/{submission_id}/validation:
+    get:
+      operationId: get_validation_result
+      summary: Get Validation Results
+      description: |
+        Retrieves the validation stage results:
+        - Risk score (0-100)
+        - Business rule compliance
+        - Appetite guideline alignment
+        - Flagged issues
+        - Recommendation (APPROVE/REFER/DECLINE)
+      tags:
+        - Submissions
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Validation results retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '202':
+          description: Validation still in progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [processing]
+        '404':
+          description: Submission or validation result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /submission/{submission_id}/memo:
+    get:
+      operationId: get_underwriting_memo
+      summary: Get Generated Underwriting Memo
+      description: |
+        Retrieves the final underwriting memo:
+        - Executive summary
+        - Risk assessment
+        - Key findings
+        - Final recommendation
+        - Links to full data artifacts
+      tags:
+        - Submissions
+      parameters:
+        - name: submission_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          required: false
+          description: Response format (json or html)
+          schema:
+            type: string
+            enum: [json, html]
+            default: json
+      responses:
+        '200':
+          description: Underwriting memo retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoResult'
+            text/html:
+              schema:
+                type: string
+                description: HTML-formatted underwriting memo
+        '202':
+          description: Memo generation in progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [processing]
+        '404':
+          description: Submission or memo not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /guidelines:
+    get:
+      operationId: get_appetite_guidelines
+      summary: Get Underwriting Appetite Guidelines
+      description: |
+        Retrieves the current underwriting appetite guidelines used for validation.
+        These are the business rules that determine submission approval eligibility.
+      tags:
+        - Guidelines
+      responses:
+        '200':
+          description: Appetite guidelines retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppetiteGuidelines'
+    
+    put:
+      operationId: update_appetite_guidelines
+      summary: Update Appetite Guidelines
+      description: |
+        Updates the underwriting appetite guidelines.
+        Changes apply to all future submission validations.
+      tags:
+        - Guidelines
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppetiteGuidelines'
+      responses:
+        '200':
+          description: Guidelines updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Appetite guidelines updated successfully
+                  updated_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid guidelines format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /submissions:
+    get:
+      operationId: list_submissions
+      summary: List Submissions
+      description: |
+        Lists submissions with optional filtering and pagination.
+        Useful for dashboard and reporting.
+      tags:
+        - Submissions
+      parameters:
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [initiated, extraction-processing, validation-processing, completed]
+        - name: recommendation
+          in: query
+          description: Filter by final recommendation
+          schema:
+            type: string
+            enum: [APPROVE, APPROVE_WITH_CONDITIONS, REFER_TO_UNDERWRITER]
+        - name: date_from
+          in: query
+          description: Filter submissions from this date
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: Filter submissions until this date
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          description: Maximum number of results
+          schema:
+            type: integer
+            default: 50
+            max: 500
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Submissions list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+                  submissions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SubmissionSummary'
+
+components:
+  schemas:
+    TriageRequest:
+      type: object
+      required:
+        - document_uri
+      properties:
+        document_uri:
+          type: string
+          format: uri
+          pattern: '^s3://[a-z0-9.-]+/.*\.pdf$'
+          example: s3://gtm-underwriter-copilot-submissions-12345/submissions/acme_renewal_2024.pdf
+          description: S3 URI of the submission PDF document
+        insured_name:
+          type: string
+          example: ACME Corporation
+          description: Optional - Known insured name for faster processing
+        policy_number:
+          type: string
+          example: POL-2024-123456
+          description: Optional - Policy number for cross-referencing
+        metadata:
+          type: object
+          description: Optional metadata for audit trail
+          properties:
+            broker_id:
+              type: string
+            broker_name:
+              type: string
+            submission_date:
+              type: string
+              format: date-time
+            priority:
+              type: string
+              enum: [low, medium, high]
+              default: medium
+        requested_features:
+          type: array
+          items:
+            type: string
+            enum: [extraction, validation, memo, all]
+          default: [all]
+          description: Which pipeline stages to execute
+
+    TriageResponse:
+      type: object
+      properties:
+        submission_id:
+          type: string
+          pattern: '^SUB-\d{8}-[A-Z0-9]{8}$'
+          example: SUB-20240326-A1B2C3D4
+          description: Unique submission identifier
+        status:
+          type: string
+          enum: [initiated, queued, processing]
+          example: processing
+        workflow_context_path:
+          type: string
+          example: s3://bucket/workflow/SUB-20240326-A1B2C3D4/context.json
+          description: S3 path to workflow context
+        estimated_completion:
+          type: string
+          format: date-time
+          description: Estimated time for workflow completion
+        message:
+          type: string
+          example: Workflow initiated successfully - your submission is being processed
+
+    SubmissionStatus:
+      type: object
+      properties:
+        submission_id:
+          type: string
+        overall_status:
+          type: string
+          enum: [initiated, extraction-processing, validation-processing, completed, failed]
+        stages:
+          type: object
+          properties:
+            orchestration:
+              $ref: '#/components/schemas/StageStatus'
+            extraction:
+              $ref: '#/components/schemas/StageStatus'
+            validation:
+              $ref: '#/components/schemas/StageStatus'
+            summary:
+              $ref: '#/components/schemas/StageStatus'
+        received_at:
+          type: string
+          format: date-time
+        estimated_completion:
+          type: string
+          format: date-time
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    StageStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        error:
+          type: string
+          description: Error message if stage failed
+        output_path:
+          type: string
+          description: S3 path to stage output
+
+    ExtractionResult:
+      type: object
+      properties:
+        submission_id:
+          type: string
+        extraction_timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [completed, failed]
+        extracted_fields:
+          type: object
+          properties:
+            insured_name:
+              type: string
+            policy_number:
+              type: string
+            policy_type:
+              type: string
+            coverage_limits:
+              type: string
+            deductible:
+              type: string
+            renewal_date:
+              type: string
+            special_conditions:
+              type: array
+              items:
+                type: string
+        historical_context:
+          type: object
+          properties:
+            prior_losses:
+              type: array
+              items:
+                type: object
+                properties:
+                  year:
+                    type: integer
+                  amount:
+                    type: number
+            loss_ratio:
+              type: number
+            years_insured:
+              type: integer
+        confidence_scores:
+          type: object
+          properties:
+            textract:
+              type: number
+              minimum: 0
+              maximum: 1
+            bedrock:
+              type: number
+              minimum: 0
+              maximum: 1
+
+    ValidationResult:
+      type: object
+      properties:
+        submission_id:
+          type: string
+        validation_timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [completed, failed]
+        risk_score:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Overall risk score from SageMaker model
+        validation_results:
+          type: object
+          properties:
+            policy_type_approved:
+              type: boolean
+            coverage_limits_approved:
+              type: boolean
+            loss_history_approved:
+              type: boolean
+            years_in_business_approved:
+              type: boolean
+            risk_score_approved:
+              type: boolean
+            overall_decision:
+              type: string
+              enum: [APPROVED, REFER]
+            issues:
+              type: array
+              items:
+                type: string
+        recommendation:
+          type: string
+          enum: [APPROVE, APPROVE_WITH_CONDITIONS, REFER_TO_UNDERWRITER]
+        detailed_analysis:
+          type: string
+          description: Bedrock-generated detailed analysis
+        flagged_issues:
+          type: array
+          items:
+            type: string
+
+    MemoResult:
+      type: object
+      properties:
+        submission_id:
+          type: string
+        summary_timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [completed, failed]
+        underwriting_memo:
+          type: string
+          description: Full text of the underwriting memo
+        extracted_data_link:
+          type: string
+          format: uri
+          description: Link to extracted data artifacts
+        validation_data_link:
+          type: string
+          format: uri
+          description: Link to validation results
+        final_recommendation:
+          type: string
+          enum: [APPROVE, APPROVE_WITH_CONDITIONS, REFER_TO_UNDERWRITER]
+        key_metrics:
+          type: object
+          properties:
+            risk_score:
+              type: number
+            policy_type:
+              type: string
+            coverage_limits:
+              type: string
+            recommendation:
+              type: string
+
+    AppetiteGuidelines:
+      type: object
+      properties:
+        policy_types:
+          type: array
+          items:
+            type: string
+          example: [Commercial General Liability, Commercial Auto, Property, Workers Compensation]
+        min_coverage_limit:
+          type: integer
+          example: 500000
+        max_coverage_limit:
+          type: integer
+          example: 5000000
+        max_loss_ratio:
+          type: number
+          example: 0.60
+        max_prior_losses_3_years:
+          type: integer
+          example: 3
+        min_years_in_business:
+          type: integer
+          example: 2
+        excluded_industries:
+          type: array
+          items:
+            type: string
+          example: [Mining, Aviation, Nuclear]
+        risk_appetite:
+          type: object
+          properties:
+            low:
+              type: object
+              properties:
+                max_score:
+                  type: integer
+            medium:
+              type: object
+              properties:
+                max_score:
+                  type: integer
+            high:
+              type: object
+              properties:
+                max_score:
+                  type: integer
+            declined:
+              type: object
+              properties:
+                max_score:
+                  type: integer
+        updated_at:
+          type: string
+          format: date-time
+
+    SubmissionSummary:
+      type: object
+      properties:
+        submission_id:
+          type: string
+        insured_name:
+          type: string
+        policy_type:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+        risk_score:
+          type: number
+        recommendation:
+          type: string
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          enum: [BadRequest, NotFound, InternalError, ServiceUnavailable]
+        message:
+          type: string
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+          description: Unique request identifier for support
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token authentication
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Submissions
+    description: Submission management and workflow
+  - name: Guidelines
+    description: Appetite guidelines management
+  - name: System
+    description: System health and status

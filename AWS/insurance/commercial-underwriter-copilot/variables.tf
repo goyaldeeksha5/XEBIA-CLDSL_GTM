@@ -87,3 +87,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_api_gateway" {
+  description = "Enable API Gateway for AgentCore API"
+  type        = bool
+  default     = true
+}
+
+variable "api_domain" {
+  description = "Custom domain name for API (e.g., api.underwriter.company.com)"
+  type        = string
+  default     = ""
+}
+
+variable "certificate_arn" {
+  description = "ACM certificate ARN for custom domain"
+  type        = string
+  default     = ""
+}
