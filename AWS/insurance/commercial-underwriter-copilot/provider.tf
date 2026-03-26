@@ -16,7 +16,6 @@ provider "aws" {
       Environment = var.environment
       Project     = "GTM_underwriter_copilot"
       ManagedBy   = "Terraform"
-      CreatedAt   = timestamp()
     }
   }
 }
