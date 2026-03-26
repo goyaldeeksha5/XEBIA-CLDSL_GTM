@@ -1,6 +1,6 @@
 # Orchestration Agent Lambda Function
 resource "aws_lambda_function" "orchestration_agent" {
-  filename            = "lambda_functions/orchestration_agent.zip"
+  filename            = "lambda_functions/build/orchestration_agent.zip"
   function_name       = "${var.project_name}-orchestration-agent"
   role                = aws_iam_role.orchestration_agent_role.arn
   handler             = "index.handler"
@@ -21,8 +21,8 @@ resource "aws_lambda_function" "orchestration_agent" {
   }
 
   depends_on = [
-    aws_iam_role_policy.agent_messaging_policy,
-    aws_iam_role_policy.cloudwatch_logs_policy
+    aws_iam_role_policy.agent_messaging_policy_orchestration,
+    aws_iam_role_policy.cloudwatch_logs_policy_orchestration
   ]
 
   tags = {
@@ -32,7 +32,7 @@ resource "aws_lambda_function" "orchestration_agent" {
 
 # Extraction Agent Lambda Function
 resource "aws_lambda_function" "extraction_agent" {
-  filename            = "lambda_functions/extraction_agent.zip"
+  filename            = "lambda_functions/build/extraction_agent.zip"
   function_name       = "${var.project_name}-extraction-agent"
   role                = aws_iam_role.extraction_agent_role.arn
   handler             = "index.handler"
@@ -52,8 +52,8 @@ resource "aws_lambda_function" "extraction_agent" {
 
   depends_on = [
     aws_iam_role_policy.extraction_agent_textract_policy,
-    aws_iam_role_policy.agent_messaging_policy,
-    aws_iam_role_policy.cloudwatch_logs_policy
+    aws_iam_role_policy.agent_messaging_policy_extraction,
+    aws_iam_role_policy.cloudwatch_logs_policy_extraction
   ]
 
   tags = {
@@ -63,7 +63,7 @@ resource "aws_lambda_function" "extraction_agent" {
 
 # Validation Agent Lambda Function
 resource "aws_lambda_function" "validation_agent" {
-  filename            = "lambda_functions/validation_agent.zip"
+  filename            = "lambda_functions/build/validation_agent.zip"
   function_name       = "${var.project_name}-validation-agent"
   role                = aws_iam_role.validation_agent_role.arn
   handler             = "index.handler"
@@ -84,8 +84,8 @@ resource "aws_lambda_function" "validation_agent" {
 
   depends_on = [
     aws_iam_role_policy.validation_sagemaker_policy,
-    aws_iam_role_policy.agent_messaging_policy,
-    aws_iam_role_policy.cloudwatch_logs_policy
+    aws_iam_role_policy.agent_messaging_policy_validation,
+    aws_iam_role_policy.cloudwatch_logs_policy_validation
   ]
 
   tags = {
@@ -95,7 +95,7 @@ resource "aws_lambda_function" "validation_agent" {
 
 # Summary Agent Lambda Function
 resource "aws_lambda_function" "summary_agent" {
-  filename            = "lambda_functions/summary_agent.zip"
+  filename            = "lambda_functions/build/summary_agent.zip"
   function_name       = "${var.project_name}-summary-agent"
   role                = aws_iam_role.summary_agent_role.arn
   handler             = "index.handler"
@@ -113,8 +113,8 @@ resource "aws_lambda_function" "summary_agent" {
   }
 
   depends_on = [
-    aws_iam_role_policy.agent_messaging_policy,
-    aws_iam_role_policy.cloudwatch_logs_policy
+    aws_iam_role_policy.agent_messaging_policy_summary,
+    aws_iam_role_policy.cloudwatch_logs_policy_summary
   ]
 
   tags = {

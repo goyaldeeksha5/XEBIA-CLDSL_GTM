@@ -1,6 +1,6 @@
 # S3 Bucket for document submissions and data storage
 resource "aws_s3_bucket" "submissions_bucket" {
-  bucket = var.s3_submission_bucket != "" ? var.s3_submission_bucket : "${var.project_name}-submissions-${data.aws_caller_identity.current.account_id}"
+  bucket = var.s3_submission_bucket != "" ? lower(replace(var.s3_submission_bucket, "_", "-")) : lower(replace("${var.project_name}-submissions-${data.aws_caller_identity.current.account_id}", "_", "-"))
 
   tags = {
     Name = "${var.project_name}-submissions"
@@ -85,34 +85,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "submissions_lifecycle" {
 
 # EventBridge Integration for document uploads
 resource "aws_s3_bucket_notification" "submissions_bucket_notification" {
-  bucket = aws_s3_bucket.submissions_bucket.id
-
-  eventbridge {}
+  bucket      = aws_s3_bucket.submissions_bucket.id
+  eventbridge = true
 }
 
-# S3 folders structure
-resource "aws_s3_object" "submission_prefix" {
-  bucket = aws_s3_bucket.submissions_bucket.id
-  key    = var.submission_prefix
-  source = "/dev/null"
-}
-
-resource "aws_s3_object" "historical_prefix" {
-  bucket = aws_s3_bucket.submissions_bucket.id
-  key    = var.historical_data_prefix
-  source = "/dev/null"
-}
-
-resource "aws_s3_object" "appetite_prefix" {
-  bucket = aws_s3_bucket.submissions_bucket.id
-  key    = var.appetite_guide_prefix
-  source = "/dev/null"
-}
-
-resource "aws_s3_object" "processed_prefix" {
-  bucket = aws_s3_bucket.submissions_bucket.id
-  key    = "processed/"
-  source = "/dev/null"
-}
-
-data "aws_caller_identity" "current" {}
+# S3 folder prefixes are created via PUT operations; no explicit resources needed

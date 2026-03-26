@@ -6,6 +6,10 @@ resource "aws_sqs_queue" "extraction_queue" {
   message_retention_seconds  = 1209600 # 14 days
   receive_wait_time_seconds  = 20
   visibility_timeout_seconds = 1800 # 30 minutes
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.extraction_dlq.arn
+    maxReceiveCount     = 3
+  })
 
   tags = {
     Name = "${var.project_name}-extraction-queue"
@@ -20,6 +24,10 @@ resource "aws_sqs_queue" "validation_queue" {
   message_retention_seconds  = 1209600
   receive_wait_time_seconds  = 20
   visibility_timeout_seconds = 1800
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.validation_dlq.arn
+    maxReceiveCount     = 3
+  })
 
   tags = {
     Name = "${var.project_name}-validation-queue"
@@ -34,6 +42,10 @@ resource "aws_sqs_queue" "summary_queue" {
   message_retention_seconds  = 1209600
   receive_wait_time_seconds  = 20
   visibility_timeout_seconds = 1800
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.summary_dlq.arn
+    maxReceiveCount     = 3
+  })
 
   tags = {
     Name = "${var.project_name}-summary-queue"
@@ -70,26 +82,7 @@ resource "aws_sqs_queue" "summary_dlq" {
   }
 }
 
-# Dead Letter Queue policy for Extraction
-resource "aws_sqs_queue_redrive_policy" "extraction_queue_dlq" {
-  queue_url           = aws_sqs_queue.extraction_queue.id
-  dead_letter_target_arn = aws_sqs_queue.extraction_dlq.arn
-  max_receive_count   = 3
-}
 
-# Dead Letter Queue policy for Validation
-resource "aws_sqs_queue_redrive_policy" "validation_queue_dlq" {
-  queue_url           = aws_sqs_queue.validation_queue.id
-  dead_letter_target_arn = aws_sqs_queue.validation_dlq.arn
-  max_receive_count   = 3
-}
-
-# Dead Letter Queue policy for Summary
-resource "aws_sqs_queue_redrive_policy" "summary_queue_dlq" {
-  queue_url           = aws_sqs_queue.summary_queue.id
-  dead_letter_target_arn = aws_sqs_queue.summary_dlq.arn
-  max_receive_count   = 3
-}
 
 # SNS Topic for notifications
 resource "aws_sns_topic" "underwriting_notifications" {
@@ -97,6 +90,9 @@ resource "aws_sns_topic" "underwriting_notifications" {
 
   tags = {
     Name = "${var.project_name}-notifications"
+  }
+  lifecycle {
+    ignore_changes = [tags]
   }
 }
 
@@ -106,5 +102,8 @@ resource "aws_sns_topic" "underwriting_alerts" {
 
   tags = {
     Name = "${var.project_name}-alerts"
+  }
+  lifecycle {
+   ignore_changes = [tags]
   }
 }

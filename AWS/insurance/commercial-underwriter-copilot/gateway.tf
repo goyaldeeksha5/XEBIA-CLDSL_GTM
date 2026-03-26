@@ -58,7 +58,6 @@ resource "aws_api_gateway_rest_api" "copilot_api" {
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "copilot_deployment" {
   rest_api_id = aws_api_gateway_rest_api.copilot_api.id
-  stage_name  = var.environment
 
   depends_on = [
     aws_api_gateway_integration.orchestration_integration,
@@ -103,6 +102,17 @@ resource "aws_api_gateway_integration" "orchestration_integration" {
   uri              = aws_lambda_function.orchestration_agent.invoke_arn
 }
 
+# Method Response
+resource "aws_api_gateway_method_response" "orchestration_response" {
+  rest_api_id    = aws_api_gateway_rest_api.copilot_api.id
+  resource_id    = aws_api_gateway_resource.triage_submission.id
+  http_method    = aws_api_gateway_method.triage_submission_post.http_method
+  status_code    = "202"
+  response_models = {
+    "application/json" = aws_api_gateway_model.triage_request.name
+  }
+}
+
 # Integration Response
 resource "aws_api_gateway_integration_response" "orchestration_response" {
   rest_api_id       = aws_api_gateway_rest_api.copilot_api.id
@@ -114,6 +124,8 @@ resource "aws_api_gateway_integration_response" "orchestration_response" {
   response_templates = {
     "application/json" = ""
   }
+
+  depends_on = [aws_api_gateway_integration.orchestration_integration]
 }
 
 # API Gateway Resource: /submission/{submission_id}
@@ -143,7 +155,7 @@ resource "aws_api_gateway_method" "get_submission_status" {
 
 # Lambda for Status Retrieval
 resource "aws_lambda_function" "status_retriever" {
-  filename            = "lambda_functions/status_retriever.zip"
+  filename            = "lambda_functions/build/status_retriever.zip"
   function_name       = "${var.project_name}-status-retriever"
   role                = aws_iam_role.orchestration_agent_role.arn
   handler             = "index.handler"
@@ -214,6 +226,8 @@ resource "aws_api_gateway_model" "triage_request" {
 # API Gateway Authorizer (AWS_IAM)
 resource "aws_api_gateway_account" "copilot" {
   cloudwatch_role_arn = aws_iam_role.api_gateway_role.arn
+
+  depends_on = [aws_iam_role_policy.api_gateway_logging]
 }
 
 # IAM Role for API Gateway CloudWatch logging
@@ -244,7 +258,9 @@ resource "aws_iam_role_policy" "api_gateway_logging" {
         Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
         ]
         Effect   = "Allow"
         Resource = "arn:aws:logs:*:*:*"
@@ -260,7 +276,7 @@ resource "aws_api_gateway_stage" "copilot" {
   stage_name    = var.environment
 
   access_log_settings {
-    cloudwatch_log_group_name = aws_cloudwatch_log_group.api_gateway_logs.name
+    destination_arn = aws_cloudwatch_log_group.api_gateway_logs.arn
     format = jsonencode({
       requestId        = "$context.requestId"
       status           = "$context.status"
@@ -295,7 +311,7 @@ resource "aws_cloudwatch_log_group" "api_gateway_logs" {
 
 # REST API Domain Name (optional - for custom domain)
 resource "aws_api_gateway_domain_name" "copilot" {
-  count            = var.api_domain != "" ? 1 : 0
+  count            = var.api_domain != "" && var.certificate_arn != "" ? 1 : 0
   domain_name      = var.api_domain
   certificate_arn  = var.certificate_arn
 

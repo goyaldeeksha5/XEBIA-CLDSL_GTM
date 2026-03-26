@@ -97,17 +97,10 @@ resource "aws_iam_role_policy" "extraction_agent_textract_policy" {
   })
 }
 
-# Policy for S3 access (all agents)
-resource "aws_iam_role_policy" "s3_access_policy" {
-  for_each = toset([
-    aws_iam_role.orchestration_agent_role.id,
-    aws_iam_role.extraction_agent_role.id,
-    aws_iam_role.validation_agent_role.id,
-    aws_iam_role.summary_agent_role.id
-  ])
-
+# Policy for S3 access (Orchestration Agent)
+resource "aws_iam_role_policy" "s3_access_policy_orchestration" {
   name   = "${var.project_name}-s3-access-policy"
-  role   = each.value
+  role   = aws_iam_role.orchestration_agent_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -128,17 +121,145 @@ resource "aws_iam_role_policy" "s3_access_policy" {
   })
 }
 
-# Policy for Bedrock access (all agents)
-resource "aws_iam_role_policy" "bedrock_access_policy" {
-  for_each = toset([
-    aws_iam_role.orchestration_agent_role.id,
-    aws_iam_role.extraction_agent_role.id,
-    aws_iam_role.validation_agent_role.id,
-    aws_iam_role.summary_agent_role.id
-  ])
+# Policy for S3 access (Extraction Agent)
+resource "aws_iam_role_policy" "s3_access_policy_extraction" {
+  name   = "${var.project_name}-s3-access-policy"
+  role   = aws_iam_role.extraction_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.s3_submission_bucket}",
+          "arn:aws:s3:::${var.s3_submission_bucket}/*"
+        ]
+      }
+    ]
+  })
+}
 
+# Policy for S3 access (Validation Agent)
+resource "aws_iam_role_policy" "s3_access_policy_validation" {
+  name   = "${var.project_name}-s3-access-policy"
+  role   = aws_iam_role.validation_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.s3_submission_bucket}",
+          "arn:aws:s3:::${var.s3_submission_bucket}/*"
+        ]
+      }
+    ]
+  })
+}
+
+# Policy for S3 access (Summary Agent)
+resource "aws_iam_role_policy" "s3_access_policy_summary" {
+  name   = "${var.project_name}-s3-access-policy"
+  role   = aws_iam_role.summary_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:GetObjectVersion"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.s3_submission_bucket}",
+          "arn:aws:s3:::${var.s3_submission_bucket}/*"
+        ]
+      }
+    ]
+  })
+}
+
+# Policy for Bedrock access (Orchestration Agent)
+resource "aws_iam_role_policy" "bedrock_access_policy_orchestration" {
   name   = "${var.project_name}-bedrock-access-policy"
-  role   = each.value
+  role   = aws_iam_role.orchestration_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock-runtime:InvokeModel",
+          "bedrock-runtime:InvokeModelWithResponseStream"
+        ]
+        Resource = "arn:aws:bedrock:${var.aws_region}::model/${var.bedrock_model_id}"
+      }
+    ]
+  })
+}
+
+# Policy for Bedrock access (Extraction Agent)
+resource "aws_iam_role_policy" "bedrock_access_policy_extraction" {
+  name   = "${var.project_name}-bedrock-access-policy"
+  role   = aws_iam_role.extraction_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock-runtime:InvokeModel",
+          "bedrock-runtime:InvokeModelWithResponseStream"
+        ]
+        Resource = "arn:aws:bedrock:${var.aws_region}::model/${var.bedrock_model_id}"
+      }
+    ]
+  })
+}
+
+# Policy for Bedrock access (Validation Agent)
+resource "aws_iam_role_policy" "bedrock_access_policy_validation" {
+  name   = "${var.project_name}-bedrock-access-policy"
+  role   = aws_iam_role.validation_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock-runtime:InvokeModel",
+          "bedrock-runtime:InvokeModelWithResponseStream"
+        ]
+        Resource = "arn:aws:bedrock:${var.aws_region}::model/${var.bedrock_model_id}"
+      }
+    ]
+  })
+}
+
+# Policy for Bedrock access (Summary Agent)
+resource "aws_iam_role_policy" "bedrock_access_policy_summary" {
+  name   = "${var.project_name}-bedrock-access-policy"
+  role   = aws_iam_role.summary_agent_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -174,15 +295,10 @@ resource "aws_iam_role_policy" "validation_sagemaker_policy" {
   })
 }
 
-# Policy for Glue access (Data normalization)
-resource "aws_iam_role_policy" "glue_access_policy" {
-  for_each = toset([
-    aws_iam_role.extraction_agent_role.id,
-    aws_iam_role.validation_agent_role.id
-  ])
-
+# Policy for Glue access (Extraction Agent)
+resource "aws_iam_role_policy" "glue_access_policy_extraction" {
   name   = "${var.project_name}-glue-access-policy"
-  role   = each.value
+  role   = aws_iam_role.extraction_agent_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -201,17 +317,32 @@ resource "aws_iam_role_policy" "glue_access_policy" {
   })
 }
 
-# Policy for CloudWatch Logs
-resource "aws_iam_role_policy" "cloudwatch_logs_policy" {
-  for_each = toset([
-    aws_iam_role.orchestration_agent_role.id,
-    aws_iam_role.extraction_agent_role.id,
-    aws_iam_role.validation_agent_role.id,
-    aws_iam_role.summary_agent_role.id
-  ])
+# Policy for Glue access (Validation Agent)
+resource "aws_iam_role_policy" "glue_access_policy_validation" {
+  name   = "${var.project_name}-glue-access-policy"
+  role   = aws_iam_role.validation_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:GetDatabase",
+          "glue:GetTable",
+          "glue:GetPartitions",
+          "glue:CreatePartition",
+          "glue:UpdatePartition"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
 
+# Policy for CloudWatch Logs (Orchestration Agent)
+resource "aws_iam_role_policy" "cloudwatch_logs_policy_orchestration" {
   name   = "${var.project_name}-cloudwatch-logs-policy"
-  role   = each.value
+  role   = aws_iam_role.orchestration_agent_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -228,17 +359,70 @@ resource "aws_iam_role_policy" "cloudwatch_logs_policy" {
   })
 }
 
-# Policy for inter-agent communication (SQS/SNS)
-resource "aws_iam_role_policy" "agent_messaging_policy" {
-  for_each = toset([
-    aws_iam_role.orchestration_agent_role.id,
-    aws_iam_role.extraction_agent_role.id,
-    aws_iam_role.validation_agent_role.id,
-    aws_iam_role.summary_agent_role.id
-  ])
+# Policy for CloudWatch Logs (Extraction Agent)
+resource "aws_iam_role_policy" "cloudwatch_logs_policy_extraction" {
+  name   = "${var.project_name}-cloudwatch-logs-policy"
+  role   = aws_iam_role.extraction_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}-*"
+      }
+    ]
+  })
+}
 
+# Policy for CloudWatch Logs (Validation Agent)
+resource "aws_iam_role_policy" "cloudwatch_logs_policy_validation" {
+  name   = "${var.project_name}-cloudwatch-logs-policy"
+  role   = aws_iam_role.validation_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}-*"
+      }
+    ]
+  })
+}
+
+# Policy for CloudWatch Logs (Summary Agent)
+resource "aws_iam_role_policy" "cloudwatch_logs_policy_summary" {
+  name   = "${var.project_name}-cloudwatch-logs-policy"
+  role   = aws_iam_role.summary_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}-*"
+      }
+    ]
+  })
+}
+
+# Policy for inter-agent communication (Orchestration Agent)
+resource "aws_iam_role_policy" "agent_messaging_policy_orchestration" {
   name   = "${var.project_name}-agent-messaging-policy"
-  role   = each.value
+  role   = aws_iam_role.orchestration_agent_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -251,23 +435,147 @@ resource "aws_iam_role_policy" "agent_messaging_policy" {
           "sqs:GetQueueAttributes"
         ]
         Resource = "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
       }
     ]
   })
 }
 
-# Attach basic Lambda execution policy
-resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
-  for_each = toset([
-    aws_iam_role.orchestration_agent_role.arn,
-    aws_iam_role.extraction_agent_role.arn,
-    aws_iam_role.validation_agent_role.arn,
-    aws_iam_role.summary_agent_role.arn
-  ])
+# Policy for inter-agent communication (Extraction Agent)
+resource "aws_iam_role_policy" "agent_messaging_policy_extraction" {
+  name   = "${var.project_name}-agent-messaging-policy"
+  role   = aws_iam_role.extraction_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      }
+    ]
+  })
+}
 
-  role       = split("/", each.value)[1]
+# Policy for inter-agent communication (Validation Agent)
+resource "aws_iam_role_policy" "agent_messaging_policy_validation" {
+  name   = "${var.project_name}-agent-messaging-policy"
+  role   = aws_iam_role.validation_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      }
+    ]
+  })
+}
+
+# Policy for inter-agent communication (Summary Agent)
+resource "aws_iam_role_policy" "agent_messaging_policy_summary" {
+  name   = "${var.project_name}-agent-messaging-policy"
+  role   = aws_iam_role.summary_agent_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*"
+      }
+    ]
+  })
+}
+
+# Attach basic Lambda execution policy (Orchestration Agent)
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution_orchestration" {
+  role       = aws_iam_role.orchestration_agent_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Attach basic Lambda execution policy (Extraction Agent)
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution_extraction" {
+  role       = aws_iam_role.extraction_agent_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Attach basic Lambda execution policy (Validation Agent)
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution_validation" {
+  role       = aws_iam_role.validation_agent_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Attach basic Lambda execution policy (Summary Agent)
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution_summary" {
+  role       = aws_iam_role.summary_agent_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 # Data source for current AWS account
 data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "apigw_cloudwatch_role" {
+  name = "apigw-cloudwatch-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "apigw_logs" {
+  role       = aws_iam_role.apigw_cloudwatch_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}

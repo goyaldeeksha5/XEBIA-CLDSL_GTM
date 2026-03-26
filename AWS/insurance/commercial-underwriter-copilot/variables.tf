@@ -13,13 +13,13 @@ variable "environment" {
 variable "project_name" {
   description = "Project name prefix"
   type        = string
-  default     = "GTM_underwriter_copilot"
+  default     = "gtm-underwriter-copilot"
 }
 
 variable "s3_submission_bucket" {
   description = "S3 bucket for incoming submissions"
   type        = string
-  default     = ""
+  default     = "gtm-underwriter-copilot-submissions"
 }
 
 variable "submission_prefix" {
